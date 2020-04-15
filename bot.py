@@ -1,7 +1,7 @@
 # Requires python3 and pip3
 # To run:
 #  - pip3 install discord.py
-#  - pip3 install dotenv_python
+#  - pip3 install python-dotenv
 #  - pip3 install jsonpickle
 #
 # You need to have a user with the role 'admin' in order to change server defaults with
