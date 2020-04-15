@@ -16,8 +16,8 @@ import string
 import random
 import discord
 import discord.utils
-import GlobalBotConfig
-import ServerChannelRoleConfig
+from GlobalBotConfig import GlobalBotConfig
+from ServerConfig import ServerConfig
 from discord import Member
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -83,8 +83,8 @@ async def on_message(message):
             global_bot_config.add_server_name(guild_id, 'my Discord Server')
 
         if not global_bot_config.exists_guild_config(guild_id):
-            global_bot_config.add_guild_config(guild_id, ServerChannelRoleConfig(validation_channel,
-                                                                                 validation_role))
+            global_bot_config.add_guild_config(guild_id, ServerConfig(validation_channel,
+                                                                      validation_role))
 
         server_config = global_bot_config.get_guild_config(guild_id)
         role = discord.utils.get(member.guild.roles, name=server_config.role)
@@ -121,7 +121,7 @@ def write_config(config, filename):
 def read_config(filename):
     with open(filename, 'r') as the_file:
         json_file = the_file.readline()
-        config_json = jsonpickle.decode(json_file, classes=[GlobalBotConfig, ServerChannelRoleConfig])
+        config_json = jsonpickle.decode(json_file, classes=[GlobalBotConfig, ServerConfig])
         return config_json
 
 
