@@ -2,6 +2,12 @@
 # To run:
 #  - pip3 install discord.py
 #  - pip3 install dotenv_python
+#  - pip3 install jsonpickle
+#
+# You need to have a user with the role 'admin' in order to change server defaults with
+# !change-role <role>
+# !change-server-name "<channel name>"
+# !change-channel <channel name>
 
 
 import os.path
@@ -10,9 +16,12 @@ import string
 import random
 import discord
 import discord.utils
+import GlobalBotConfig
+import ServerChannelRoleConfig
 from discord import Member
 from discord.ext import commands
 from dotenv import load_dotenv
+
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -23,53 +32,6 @@ bot = commands.Bot(command_prefix='!')
 validation_channel = os.getenv("VALIDATION_CHANNEL")
 validation_role = os.getenv("VALIDATION_ROLE")
 admin_role = os.getenv("ADMIN_ROLE")
-
-
-class ServerChannelRoleConfig:
-    def __init__(self, channel, role):
-        self.channel = channel
-        self.role = role
-
-    def __str__(self):
-        return f'[channel: {self.channel}, role: {self.role}]'
-
-
-class GlobalBotConfig:
-    def __init__(self):
-        self.dict_of_user_to_code = {}
-        self.dict_of_guild_to_config = {}
-        self.dict_of_guild_to_server_name = {}
-
-    def add_server_name(self, guild_id, name):
-        self.dict_of_guild_to_server_name[guild_id] = name
-
-    def get_server_name(self, guild_id):
-        return self.dict_of_guild_to_server_name[guild_id]
-
-    def exists_server_name(self, guild_id):
-        return guild_id in self.dict_of_guild_to_server_name
-
-    def add_guild_config(self, guild_id, server_channel_role_config):
-        self.dict_of_guild_to_config[guild_id] = server_channel_role_config
-
-    def get_guild_config(self, guild_id):
-        return self.dict_of_guild_to_config[guild_id]
-
-    def exists_guild_config(self, guild_id):
-        return guild_id in self.dict_of_guild_to_config
-
-    def add_user_code(self, user_id, code):
-        self.dict_of_user_to_code[user_id] = code
-
-    def get_user_code(self, user_id):
-        return self.dict_of_user_to_code[user_id]
-
-    def exists_user_code(self, user_id):
-        return user_id in self.dict_of_user_to_code
-
-    def delete_user_code(self, user_id):
-        del self.dict_of_user_to_code[user_id]
-
 
 global_bot_config = GlobalBotConfig()
 
@@ -82,15 +44,15 @@ async def change_config_role(ctx, arg='new_user'):
     await ctx.channel.send(f'Changed new user role to: {arg}')
 
 
-@commands.has_role('admin')
+@commands.has_role(admin_role)
 @bot.command(name='change-server-name')
-async def change_channel_name(ctx, arg='my Discord Server'):
+async def change_server_name(ctx, arg='my Discord Server'):
     global_bot_config.add_server_name(ctx.guild.id, arg)
     write_log(f'changing to server name to: {arg}')
     await ctx.channel.send(f'Changed server name to: {arg}')
 
 
-@commands.has_role('admin')
+@commands.has_role(admin_role)
 @bot.command(name='change-channel')
 async def change_channel(ctx, arg='guest'):
     global_bot_config.get_guild_config(ctx.guild.id).channel = arg
@@ -111,19 +73,26 @@ async def on_member_join(member):
 
 @bot.event
 async def on_message(message):
-
     member = message.author
     if isinstance(member, Member):
         guild_id = member.guild.id
+
+        # if we dont have the server configs set up,
+        # then do that.
         if not global_bot_config.exists_server_name(guild_id):
             global_bot_config.add_server_name(guild_id, "my Discord Server")
 
         if not global_bot_config.exists_guild_config(guild_id):
             global_bot_config.add_guild_config(guild_id, ServerChannelRoleConfig(validation_channel,
                                                                                  validation_role))
+
         server_config = global_bot_config.get_guild_config(guild_id)
         role = discord.utils.get(member.guild.roles, name=server_config.role)
         user_id = member.id
+        # if we found the role in the guild
+        # and the user is in the required channel
+        # and the user entered the code.
+        # Then give that user the new user role.
         if role is not None:
             if message.channel.name == server_config.channel:
                 if global_bot_config.exists_user_code(user_id):
@@ -157,7 +126,6 @@ def read_config(filename):
 
 
 def random_string(string_length=10):
-    """Generate a random string of fixed length """
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(string_length))
 
