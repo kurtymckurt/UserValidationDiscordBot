@@ -1,6 +1,6 @@
 # UserValidationDiscordBot
 
-#Setup
+# Setup
 - Install python3
 - Install pip3
 - pip3 install discord.py
@@ -10,5 +10,5 @@
 
 To change server defaults, you need to have the 'admin' role on a user
 
-#Run
+# Run
 python3 bot.py
