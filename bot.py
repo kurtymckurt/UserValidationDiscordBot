@@ -29,9 +29,9 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 client = discord.Client()
 bot = commands.Bot(command_prefix='!')
 
-validation_channel = os.getenv("VALIDATION_CHANNEL")
-validation_role = os.getenv("VALIDATION_ROLE")
-admin_role = os.getenv("ADMIN_ROLE")
+validation_channel = os.getenv('VALIDATION_CHANNEL')
+validation_role = os.getenv('VALIDATION_ROLE')
+admin_role = os.getenv('ADMIN_ROLE')
 
 global_bot_config = GlobalBotConfig()
 
@@ -80,7 +80,7 @@ async def on_message(message):
         # if we dont have the server configs set up,
         # then do that.
         if not global_bot_config.exists_server_name(guild_id):
-            global_bot_config.add_server_name(guild_id, "my Discord Server")
+            global_bot_config.add_server_name(guild_id, 'my Discord Server')
 
         if not global_bot_config.exists_guild_config(guild_id):
             global_bot_config.add_guild_config(guild_id, ServerChannelRoleConfig(validation_channel,
@@ -130,10 +130,10 @@ def random_string(string_length=10):
     return ''.join(random.choice(letters) for i in range(string_length))
 
 
-print("Starting bot... awaiting commands and messages.")
+print('Starting bot... awaiting commands and messages.')
 
 if os.path.exists('bot.conf'):
-    global_bot_config = read_config("bot.conf")
+    global_bot_config = read_config('bot.conf')
 
 try:
     bot.run(TOKEN)
