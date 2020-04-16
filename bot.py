@@ -2,45 +2,39 @@
 # To run:
 #  - pip3 install discord.py
 #  - pip3 install python-dotenv
-#  - pip3 install jsonpickle
+#  - pip3 install tinydb
 #
 # You need to have a user with the role 'admin' in order to change server defaults with
 # !change-role <role>
 # !change-server-name "<channel name>"
 # !change-channel <channel name>
-import datetime
 import os.path
-import jsonpickle
 import string
 import random
 import discord
 import discord.utils
 import asyncio
 from GlobalBotConfig import GlobalBotConfig
-from NewUser import NewUser
-from ServerConfig import ServerConfig
 from discord import Member
-from discord.ext import commands, tasks
+from discord.ext import commands
 from dotenv import load_dotenv
-
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-client = discord.Client()
 bot = commands.Bot(command_prefix='!')
 
 validation_channel = os.getenv('VALIDATION_CHANNEL')
 validation_role = os.getenv('VALIDATION_ROLE')
 admin_role = os.getenv('ADMIN_ROLE')
 
-global_bot_config = GlobalBotConfig()
+global_bot_config = GlobalBotConfig.get_instance()
 
 
 @commands.has_role(admin_role)
 @bot.command(name='change-role')
 async def change_config_role(ctx, arg='new_user'):
-    global_bot_config.get_guild_config(ctx.guild.id).role = arg
+    global_bot_config.add_role(ctx.guild.id, arg)
     write_log(f'changing to role to: {arg} {global_bot_config.get_guild_config(ctx.guild.id)}')
     await ctx.channel.send(f'Changed new user role to: {arg}')
 
@@ -56,49 +50,66 @@ async def change_server_name(ctx, arg='my Discord Server'):
 @commands.has_role(admin_role)
 @bot.command(name='change-channel')
 async def change_channel(ctx, arg='guest'):
-    global_bot_config.get_guild_config(ctx.guild.id).channel = arg
+    global_bot_config.add_channel(ctx.guild.id, arg)
     write_log(f'changing to channel to: {arg} {global_bot_config.get_guild_config(ctx.guild.id)}')
     await ctx.channel.send(f'Changed channel  to: {arg}')
 
 
 @commands.has_role(admin_role)
 @bot.command(name='see-config')
-async def change_channel(ctx):
-    channel = global_bot_config.get_guild_config(ctx.guild.id).channel
-    role = global_bot_config.get_guild_config(ctx.guild.id).role
-    server_name = global_bot_config.get_server_name(ctx.guild.id)
+async def see_config(ctx):
+    server_config = global_bot_config.get_guild_config(ctx.guild.id)
+    server_name = server_config['server_name']
+    channel = server_config['channel']
+    role = server_config['role']
     message = f'Channel: {channel}, Role: {role}, Server name: {server_name}'
-    global_bot_config.get_guild_config(ctx.guild.id).channel
     await ctx.channel.send(f'Current discord config: {message}')
+
+
+@commands.has_role(admin_role)
+@bot.command(name='change-rules')
+async def see_config(ctx, arg):
+    global_bot_config.add_rules(ctx.guild.id, arg)
+    write_log(f'changing rules to: {arg}')
+    await ctx.channel.send(f'changing rules  to: {arg}')
 
 
 @bot.event
 async def on_member_join(member):
     code = random_string(5).upper()
     global_bot_config.add_user_code(member.guild.id, member.id, code)
+    server_config = global_bot_config.get_guild_config(member.guild.id)
+    server_name = server_config['server_name']
+    channel_name = server_config['channel']
+    server_rules = server_config['server_rules']
     await member.create_dm()
     await member.dm_channel.send(
-        f'Hi {member.name}, welcome to {global_bot_config.get_server_name(member.guild.id)}! '
-        f'Go to channel {global_bot_config.get_guild_config(member.guild.id).channel} and enter the code {code}'
+        f'Hi {member.name}, welcome to {server_name}!'
+    )
+    await member.dm_channel.send(
+        f'Remember to follow the rules! The current rules are: {server_rules}.'
+    )
+    await member.dm_channel.send(
+          f'Go to channel {channel_name} and enter the code {code}'
+    )
+    await member.dm_channel.send(
+          f'By typing the code into the channel, you are agreeing to all rules written and unwritten.'
     )
 
 
 @bot.event
 async def on_guild_join(guild):
     guild_id = guild.id
-    if not global_bot_config.exists_server_name(guild_id):
-        global_bot_config.add_server_name(guild_id, 'my Discord Server')
 
     if not global_bot_config.exists_guild_config(guild_id):
-        global_bot_config.add_guild_config(guild_id, ServerConfig(validation_channel,
-                                                                  validation_role))
+        global_bot_config.create_guild_config(guild_id)
 
 
 async def daily_user_check():
     while not bot.is_closed():
         write_log(f'Removing expired users...')
         global_bot_config.delete_expired_users()
-        await asyncio.sleep(86400)
+        await asyncio.sleep(60)
 
 
 @bot.event
@@ -114,26 +125,22 @@ async def on_message(message):
 
         # if we dont have the server configs set up,
         # then do that.
-        if not global_bot_config.exists_server_name(guild_id):
-            global_bot_config.add_server_name(guild_id, 'my Discord Server')
-
         if not global_bot_config.exists_guild_config(guild_id):
-            global_bot_config.add_guild_config(guild_id, ServerConfig(validation_channel,
-                                                                      validation_role))
+            global_bot_config.create_guild_config(guild_id)
 
         server_config = global_bot_config.get_guild_config(guild_id)
-        role = discord.utils.get(member.guild.roles, name=server_config.role)
+        role = discord.utils.get(member.guild.roles, name=server_config['role'])
         user_id = member.id
         # if we found the role in the guild
         # and the user is in the required channel
         # and the user entered the code.
         # Then give that user the new user role.
         if role is not None:
-            if message.channel.name == server_config.channel:
+            if message.channel.name == server_config['channel']:
                 if global_bot_config.exists_user_code(guild_id, user_id):
                     if message.content == global_bot_config.get_user_code(guild_id, user_id):
-                        global_bot_config.delete_user_code(guild_id, user_id)
                         await member.add_roles(role)
+                        global_bot_config.delete_user_code(guild_id, user_id)
 
     await bot.process_commands(message)
 
@@ -146,19 +153,6 @@ def write_log(log_line):
     print(log_line)
 
 
-def write_config(config, filename):
-    with open(filename, 'w') as the_file:
-        the_file.write(jsonpickle.encode(config))
-        the_file.close()
-
-
-def read_config(filename):
-    with open(filename, 'r') as the_file:
-        json_file = the_file.readline()
-        config_json = jsonpickle.decode(json_file, classes=[GlobalBotConfig, ServerConfig, NewUser])
-        return config_json
-
-
 def random_string(string_length=10):
     letters = string.ascii_lowercase
     return ''.join(random.choice(letters) for i in range(string_length))
@@ -166,16 +160,5 @@ def random_string(string_length=10):
 
 print('Starting bot... awaiting commands and messages.')
 
-if os.path.exists('bot.conf'):
-    global_bot_config = read_config('bot.conf')
-
-try:
-    bot.loop.create_task(daily_user_check())
-    bot.run(TOKEN)
-except RuntimeError:
-    pass
-finally:
-    # Need to do this until i can figure out why it's not deserializing
-    # the user object properly
-    global_bot_config.delete_all_users_code()
-    write_config(global_bot_config, 'bot.conf')
+bot.loop.create_task(daily_user_check())
+bot.run(TOKEN)
