@@ -8,18 +8,19 @@
 # !change-role <role>
 # !change-server-name "<channel name>"
 # !change-channel <channel name>
-
-
+import datetime
 import os.path
 import jsonpickle
 import string
 import random
 import discord
 import discord.utils
+import asyncio
 from GlobalBotConfig import GlobalBotConfig
+from NewUser import NewUser
 from ServerConfig import ServerConfig
 from discord import Member
-from discord.ext import commands
+from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
 
@@ -60,15 +61,49 @@ async def change_channel(ctx, arg='guest'):
     await ctx.channel.send(f'Changed channel  to: {arg}')
 
 
+@commands.has_role(admin_role)
+@bot.command(name='see-config')
+async def change_channel(ctx):
+    channel = global_bot_config.get_guild_config(ctx.guild.id).channel
+    role = global_bot_config.get_guild_config(ctx.guild.id).role
+    server_name = global_bot_config.get_server_name(ctx.guild.id)
+    message = f'Channel: {channel}, Role: {role}, Server name: {server_name}'
+    global_bot_config.get_guild_config(ctx.guild.id).channel
+    await ctx.channel.send(f'Current discord config: {message}')
+
+
 @bot.event
 async def on_member_join(member):
     code = random_string(5).upper()
-    global_bot_config.add_user_code(member.id, code)
+    global_bot_config.add_user_code(member.guild.id, member.id, code)
     await member.create_dm()
     await member.dm_channel.send(
         f'Hi {member.name}, welcome to {global_bot_config.get_server_name(member.guild.id)}! '
         f'Go to channel {global_bot_config.get_guild_config(member.guild.id).channel} and enter the code {code}'
     )
+
+
+@bot.event
+async def on_guild_join(guild):
+    guild_id = guild.id
+    if not global_bot_config.exists_server_name(guild_id):
+        global_bot_config.add_server_name(guild_id, 'my Discord Server')
+
+    if not global_bot_config.exists_guild_config(guild_id):
+        global_bot_config.add_guild_config(guild_id, ServerConfig(validation_channel,
+                                                                  validation_role))
+
+
+async def daily_user_check():
+    while not bot.is_closed():
+        write_log(f'Removing expired users...')
+        global_bot_config.delete_expired_users()
+        await asyncio.sleep(86400)
+
+
+@bot.event
+async def on_guild_remove(guild):
+    global_bot_config.delete_guild(guild.id)
 
 
 @bot.event
@@ -95,12 +130,10 @@ async def on_message(message):
         # Then give that user the new user role.
         if role is not None:
             if message.channel.name == server_config.channel:
-                if global_bot_config.exists_user_code(user_id):
-                    if message.content == global_bot_config.get_user_code(user_id):
-                        global_bot_config.delete_user_code(user_id)
+                if global_bot_config.exists_user_code(guild_id, user_id):
+                    if message.content == global_bot_config.get_user_code(guild_id, user_id):
+                        global_bot_config.delete_user_code(guild_id, user_id)
                         await member.add_roles(role)
-        else:
-            write_log(f'Role {server_config.role} was not found in the guild.')
 
     await bot.process_commands(message)
 
@@ -110,6 +143,7 @@ def write_log(log_line):
         the_file.write(log_line)
         the_file.write('\n')
         the_file.close()
+    print(log_line)
 
 
 def write_config(config, filename):
@@ -121,7 +155,7 @@ def write_config(config, filename):
 def read_config(filename):
     with open(filename, 'r') as the_file:
         json_file = the_file.readline()
-        config_json = jsonpickle.decode(json_file, classes=[GlobalBotConfig, ServerConfig])
+        config_json = jsonpickle.decode(json_file, classes=[GlobalBotConfig, ServerConfig, NewUser])
         return config_json
 
 
@@ -136,8 +170,12 @@ if os.path.exists('bot.conf'):
     global_bot_config = read_config('bot.conf')
 
 try:
+    bot.loop.create_task(daily_user_check())
     bot.run(TOKEN)
 except RuntimeError:
     pass
 finally:
+    # Need to do this until i can figure out why it's not deserializing
+    # the user object properly
+    global_bot_config.delete_all_users_code()
     write_config(global_bot_config, 'bot.conf')
