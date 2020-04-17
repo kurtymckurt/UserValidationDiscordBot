@@ -14,6 +14,7 @@ import random
 import discord
 import discord.utils
 import asyncio
+import sys
 from GlobalBotConfig import GlobalBotConfig
 from discord import Member
 from discord.ext import commands
@@ -28,7 +29,12 @@ validation_channel = os.getenv('VALIDATION_CHANNEL')
 validation_role = os.getenv('VALIDATION_ROLE')
 admin_role = os.getenv('ADMIN_ROLE')
 
-global_bot_config = GlobalBotConfig.get_instance()
+
+filename = "db.json"
+if len(sys.argv) >= 2:
+    filename = sys.argv[1]
+
+global_bot_config = GlobalBotConfig.get_instance(filename)
 
 
 @commands.has_role(admin_role)

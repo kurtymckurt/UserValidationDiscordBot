@@ -12,13 +12,13 @@ class GlobalBotConfig:
     __instance = None
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, filename):
         if cls.__instance is None:
-            cls.__instance = GlobalBotConfig()
+            cls.__instance = GlobalBotConfig(filename)
         return cls.__instance
 
-    def __init__(self):
-        self.db = TinyDB('db.json')
+    def __init__(self, filename):
+        self.db = TinyDB(filename)
         self.config_table = self.db.table("config")
         self.user_table = self.db.table("user")
 
