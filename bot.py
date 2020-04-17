@@ -68,7 +68,8 @@ async def see_config(ctx):
     server_name = server_config['server_name']
     channel = server_config['channel']
     role = server_config['role']
-    message = f'Channel: {channel}, Role: {role}, Server name: {server_name}'
+    server_rules = server_config['server_rules']
+    message = f'Channel: {channel}, Role: {role}, Server name: {server_name}, rules: {server_rules}'
     await ctx.channel.send(f'Current discord config: {message}')
 
 
