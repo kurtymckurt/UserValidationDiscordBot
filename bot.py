@@ -61,6 +61,13 @@ async def change_channel(ctx, arg='guest'):
     await ctx.channel.send(f'Changed channel  to: {arg}')
 
 
+@bot.command(name='rules')
+async def get_rules(ctx):
+    server_config = global_bot_config.get_guild_config(ctx.guild.id)
+    server_rules = server_config['server_rules']
+    await ctx.channel.send(f'{server_rules}')
+
+
 @commands.has_role(admin_role)
 @bot.command(name='see-config')
 async def see_config(ctx):
@@ -116,7 +123,7 @@ async def daily_user_check():
     while not bot.is_closed():
         write_log(f'Removing expired users...')
         global_bot_config.delete_expired_users()
-        await asyncio.sleep(60)
+        await asyncio.sleep(86400)
 
 
 @bot.event
