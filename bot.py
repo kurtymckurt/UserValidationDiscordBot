@@ -28,6 +28,7 @@ bot = commands.Bot(command_prefix='!')
 validation_channel = os.getenv('VALIDATION_CHANNEL')
 validation_role = os.getenv('VALIDATION_ROLE')
 admin_role = os.getenv('ADMIN_ROLE')
+welcome_channel = os.getenv('WELCOME_CHANNEL')
 
 
 filename = "db.json"
@@ -68,6 +69,23 @@ async def get_rules(ctx):
     await ctx.channel.send(f'{server_rules}')
 
 
+@bot.command(name='commands')
+async def send_commands(ctx):
+    message = ' Admin commands: change-server-name <name>, change-role <role>, change-channel <channel name>  ' \
+              ' Global commands: rules, resend-code, see-config'
+    await ctx.channel.send(f'{message}')
+
+
+@bot.command(name='resend-code')
+async def resend_code(ctx):
+    member = ctx.message.author
+    code = global_bot_config.get_user_code(ctx.guild.id, member.id)
+    if code is None:
+        code = random_string(5).upper()
+        global_bot_config.add_user_code(member.guild.id, member.id, code)
+    await send_code(member, code)
+
+
 @commands.has_role(admin_role)
 @bot.command(name='see-config')
 async def see_config(ctx):
@@ -82,7 +100,7 @@ async def see_config(ctx):
 
 @commands.has_role(admin_role)
 @bot.command(name='change-rules')
-async def see_config(ctx, arg):
+async def change_rules(ctx, arg):
     global_bot_config.add_rules(ctx.guild.id, arg)
     write_log(f'changing rules to: {arg}')
     await ctx.channel.send(f'changing rules  to: {arg}')
@@ -92,6 +110,10 @@ async def see_config(ctx, arg):
 async def on_member_join(member):
     code = random_string(5).upper()
     global_bot_config.add_user_code(member.guild.id, member.id, code)
+    await send_code(member, code)
+
+
+async def send_code(member, code):
     server_config = global_bot_config.get_guild_config(member.guild.id)
     server_name = server_config['server_name']
     channel_name = server_config['channel']
@@ -104,10 +126,10 @@ async def on_member_join(member):
         f'Remember to follow the rules! The current rules are: {server_rules}.'
     )
     await member.dm_channel.send(
-          f'Go to channel {channel_name} and enter the code {code}'
+        f'Go to channel {channel_name} and enter the code {code}'
     )
     await member.dm_channel.send(
-          f'By typing the code into the channel, you are agreeing to all rules written and unwritten.'
+        f'By typing the code into the channel, you are agreeing to all rules written and unwritten.'
     )
 
 
@@ -155,6 +177,11 @@ async def on_message(message):
                     if message.content == global_bot_config.get_user_code(guild_id, user_id):
                         await member.add_roles(role)
                         global_bot_config.delete_user_code(guild_id, user_id)
+                        channel = discord.utils.get(member.guild.channels, name=welcome_channel)
+                        await channel.send(f'Welcome {member.display_name} to the discord!')
+                admin_role_obj = discord.utils.get(member.guild.roles, name=admin_role)
+                if admin_role_obj not in member.roles:
+                    await message.delete()
 
     await bot.process_commands(message)
 

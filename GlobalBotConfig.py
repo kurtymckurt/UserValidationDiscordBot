@@ -77,6 +77,9 @@ class GlobalBotConfig:
 
     def get_user_code(self, guild_id, user_id):
         user = Query()
+        code_record = self.user_table.search((user.guild_id == guild_id) & (user.user_id == user_id))
+        if len(code_record) == 0:
+            return None
         return self.user_table.search((user.guild_id == guild_id) & (user.user_id == user_id))[0]['code']
 
     def exists_user_code(self, guild_id, user_id):
