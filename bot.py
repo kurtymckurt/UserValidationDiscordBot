@@ -10,7 +10,6 @@
 # !change-channel <channel name>
 import os.path
 import string
-import random
 import discord
 import discord.utils
 import asyncio
@@ -19,6 +18,7 @@ from GlobalBotConfig import GlobalBotConfig
 from discord import Member
 from discord.ext import commands
 from dotenv import load_dotenv
+import secrets
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -196,7 +196,7 @@ def write_log(log_line):
 
 def random_string(string_length=10):
     letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(string_length))
+    return ''.join(secrets.SystemRandom().choice(letters) for i in range(string_length))
 
 
 print('Starting bot... awaiting commands and messages.')
