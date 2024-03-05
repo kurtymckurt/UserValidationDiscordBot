@@ -79,8 +79,7 @@ async def send_commands(ctx):
 @bot.command(name='resend-code')
 async def resend_code(ctx):
     member = ctx.message.author
-    code = global_bot_config.get_user_code(ctx.guild.id, member.id)
-    if code is None:
+    if (code := global_bot_config.get_user_code(ctx.guild.id, member.id)) is None:
         code = random_string(5).upper()
         global_bot_config.add_user_code(member.guild.id, member.id, code)
     await send_code(member, code)
